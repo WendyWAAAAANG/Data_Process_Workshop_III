@@ -1,0 +1,112 @@
+---
+title: "Exercise1"
+author: "Ruoxin WANG"
+date: "2023-03-13"
+output: pdf_document
+---
+
+```{r}
+# install and load th required packages.
+# install.packages(c('tuneR', 'seewave'))
+library(tuneR)
+library(seewave)
+##########################
+#       Path Define      #
+##########################
+path <- "C:/Users/UIC/Downloads/"
+```
+
+```{r}
+# Q1 start.
+# import audio file into an object named s determine the class of s.
+s <- readWave(paste0(path, "Allobates_femoralis.wav"), from = 1, to = Inf)
+class(s)
+# determine the duration of s.
+#duration <- length(s@left) / s@samp.rate
+res <- duration(s)
+print(res)
+```
+
+```{r}
+# Q2 oscillogram.
+# visualizes as an oscillogram.
+oscillo(s)
+
+# listen to s.
+listen(s)
+
+# Determine graphically the start and end time positions of the first call.
+# cat("Please enter the start time of the first call (in seconds): ")
+# start_time <- as.numeric(readLines(n = 1))
+# cat("Please enter the end time of the first call (in seconds): ")
+# end_time <- as.numeric(readLines(n = 1))
+start_time = 0.09
+end_time = 0.23
+
+# Create a new object named c1 containing only the first call.
+c1 <- cutw(s, from = start_time, to = end_time, output = 'Wave')
+#c1 <- extractWave(s, from = start_time, to = end_time, xunit='time')
+
+# Save the new object (c1 object) into a new audio file named Allobates_femoralis_c1.wav
+oscillo(c1)
+#writeWave(c1, filename = paste0(path, "Allobates_femoralis_c1.wav"))
+savewav(c1, filename = paste0(path, "Allobates_femoralis_c1.wav"))
+```
+
+```{r}
+# Q3 temporal analysis.
+# take manual time measurements on teh amplitude envelope c1.
+oscillo(env(c1, plot = FALSE), f = c1@samp.rate, identify = TRUE)
+# take automatic measurements on c1.
+#temp_auto <- timer(c1, msmooth = c(40, 90), threshold = 3, envt = 'hil')
+timer(c1, ssmooth = 200, threshold = 3)
+```
+
+```{r}
+# Q4 dominant frequency.
+# visualize c1 as a spectrogram (default parameters).
+spectro(c1)
+
+# repeat the following spectrogram of c1 obtained with a Fourier window made of 1024 samples and an overlap between successive windows of 87.5.
+spectro(c1, osc = TRUE, collevels = seq(-60,0,2), l = 1024,ovlp = 87.5, colwave = 'blue')
+
+# track the dominant frequency of c1.
+df <- dfreq(c1, threshold = 5, wl=1024, ovlp=87.5, plot = FALSE)
+```
+
+```{r}
+# track the fundamental frequency of c1.
+f0 <- fund(c1, threshold = 5, wl=1024, ovlp=87.5, fmax = 2000)
+```
+
+
+```{r}
+# Q5 spectral analysis.
+# compute the mean frequency spectrum of the first note of c1 (tip : use timer and meanspec).
+res <- timer(c1, ssmooth=200, threshold = 3, plot = FALSE)
+msp <- meanspec(c1, from = res$s.start[1], to = res$s.end[2], plot = FALSE)
+head(msp)
+
+#msp <- meanspec(c1, plot = FALSE)
+#freq_total <- msp[2,1]
+#perd <- sum(timer(c1)$s.end - timer(c1)$s.start)
+#perd <- (timer(c1)$s.end - timer(c1)$s.start)[1]
+#freq_avg <- freq_total / perd
+
+# find the main frequency peaks of the mean frequency spectrum.
+fpeaks(msp, amp = c(0.01, 0.01),threshold = 0.3)
+
+#get the main features (properties) of the mean frequency spectrum.
+specprop(msp)
+
+# Using meanspec and which find the dominant frequency.
+df_msp <- msp[which.max(msp)]
+print(df_msp)
+
+# Plot with meanspec.
+meanspec(c1, from = res$s.start[1], to = res$s.end[2], plot = TRUE)
+
+# Using box and sound scapespec plot the spectrogram of frequencies.
+box()
+soundscapespec(c1)
+```

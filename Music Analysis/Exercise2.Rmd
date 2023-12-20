@@ -1,0 +1,280 @@
+---
+title: "Exercise2 -- Decoding and playing notes"
+author: "Ruoxin WANG"
+date: "2023-03-23"
+output: pdf_document
+---
+
+```{r}
+# 1. Load Library (tuneR and seewave) and set path.
+# install.packages( c('tuneR', 'seewave'))
+library(tuneR)
+library(seewave)
+#path="~/Desktop/Semester 2 of 2022-2023/DPWIII/Music Analysis"
+##########################
+#       Path Define      #
+##########################
+path <- "C:/Users/UIC/Downloads/"
+```
+
+```{r}
+# 2. Play a file.
+play(paste0(path, "Allobates_femoralis.wav"))
+#s <- readWave(filename = 'Allobates_femoralis.wav', from = 1, to = Inf)
+#play(s)
+```
+
+```{r}
+# 3. Generate a sound.
+# defines the times in seconds if a sample has a duration of 3 seconds and a frequency of 8000 Hz:
+t = seq(0, 3, 1/8000)
+
+# 440 Hz sine wave that lasts t length seconds (here, 3 seconds):
+u = (2^15-1)*sin(2*pi*440*t)
+
+# Finally we generate the wav variable :
+w = Wave(u, samp.rate = 8000, bit=16)
+
+# Look at u and w . How many values? What are the min, max, and mean values?
+summary(u)
+summary(w)
+
+# Play w.
+play(w)
+```
+
+```{r}
+# 4. Play a series of notes.
+# The sampling rate used in the playing function:
+sr = 8000;
+
+# The length of time (secs) of the smallest musical time unit:
+tatum= .1;
+
+# use playing function playit to play a melody.
+# The melody is expressed using a midi pitch for each spaced tatum value :
+playit = function(f){
+   h = NULL;
+   bits= 16 # bit depth
+   f[f<1]= f[f<1]+ 8
+   for (i in 1:length(f)){
+      fr = 440*2^((f[i]-69)/12);
+      h = c(h,rep(fr,sr*tatum))
+    }
+    y = sin(2*pi*cumsum(h/sr))
+    u = Wave(2^(bits-4)*y,samp.rate= sr, bit=bits)
+    tuneR::play(u)
+}
+```
+
+```{r}
+# the lowest possible midi pitch.
+lo = 80;
+# the highest possible midi pitch.
+hi = 100;
+# p -- the probability of keeping the same direction.
+# 1-p -- probability of keeping the same direction.
+p = .8;
+# notes -- a series of 50 notes we want to generate.
+notes = 50;
+# s -- a array of note.
+s = rep(0, notes);
+s[1] = lo;
+# up -- a start with an upward chromatic direction.
+up = 1;
+
+for (i in 2:notes){
+  if (up){
+    # if up move upward if possible
+    s[i]= min(s[i-1]+1,hi);
+    }
+  else{
+    s[i]= max(lo,s[i-1]-1);
+    }
+  if (runif(1)> p) up = 1-up;
+}
+
+# s is given as a parameter to function playit.
+playit(s)
+```
+
+```{r}
+# modify funciton playit so that it can save the series of notes in a wav file.
+playit = function(f, fname){
+  h = NULL; bits= 16 # bit depth
+  f[f<1]= f[f<1]+ 8
+  for (i in 1:length(f)){
+    fr = 440*2^((f[i]-69)/12);
+    h = c(h,rep(fr,sr*tatum))
+  }
+  y = sin(2*pi*cumsum(h/sr))
+  u = Wave(2^(bits-4)*y,samp.rate= sr, bit=bits)
+  tuneR::play(u)
+  #tuneR::writeWave(u, filename=fname)
+  savewav(u, filename=fname)
+}
+```
+
+```{r}
+# 5. Find equivalence between American notation of notes and midi values (from 68 to 100).
+table1 <-data.frame("Midivalue" = seq(68,100), "American notation" =
+                      c("G#4","A4","A#4","B4","C5","C#5","D5","D#5","E5","F5",
+                        "F#5","G5","G#5","A5","A#5","B5","C6","C#6","D6","D#6",
+                        "E6","F6","F#6","G6","G#6","A6","A#6","B6","C7","C#7",
+                        "D7","D#7","E7"))
+table1
+```
+
+```{r}
+# 6. play first notes of Beethoven 5th symphony:sol sol sol mi fa fa fa re.
+# Using c() function in R to create a vector of a series of midi values.
+# Note:	     C	 D	 E	 F	 G	 A	 B
+# Syllable:	DO	RE	MI	FA	SOL	LA	SI
+first_notes = c(79, 79, 79, 76, 77, 77, 77, 74)
+
+# Then, call playit and save it in the test.wav file.
+playit(first_notes , paste0(path,"first_notes.wav"))
+```
+
+```{r}
+# 7. write a function you call transcribeMusic that will convert the sound file into a sequence of notes.
+transcribeMusic <- function(wavFile, widthSample = 4096) { # add your code below
+  # use periodogram function to obtain time series info from wave file.
+  # the output is an object of class Wspec.
+  myWspec <- periodogram(wavFile, width = widthSample)
+  # use FF function to estimate fundamental frequencies from myWspec, to get freqWav.
+  freqWav <- FF(myWspec)
+  # # use noteFromFF function to derive notes from given frequencies in freqWav
+  # to get noteNum.
+  noteNum <- noteFromFF(freqWav)
+  # get rid of null value from notes in the above object noteNum
+  # to get noteNum2 without nulls
+  noteNum2 <- noteNum[!is.na(noteNum)]
+  #print note numbers of noteNum2.
+  print(noteNum2)
+  # use notenames to generate note names (noteTxt) from noteNum2.
+  noteTxt <- notenames(noteNum2)
+  return(noteTxt)
+  }
+```
+
+```{r}
+# 8. Using transcribeMusic guess the sequence of notes of the bird (file Allobates_femoralis.wav).
+# read in audio file as originalSound.
+originalSound <- readWave(paste0(path, "Allobates_femoralis.wav"))
+# Convert sound file into a sequence of notes.
+noteTxt = transcribeMusic(originalSound)
+print(noteTxt)
+playit(notes , paste0(path,"bird.wav"))
+```
+
+```{r}
+# 9. Read the music files with mp3 format champagne.mp3 and Vonstroke.mp3.
+# import mp3 file champagne.mp3 and Vonstroke.mp3.
+wmp1 = readMP3(paste0(path, "champagne.mp3"))
+wmp2 = readMP3(paste0(path, "electro.mp3"))
+# convert mp3 file in wav format.
+writeWave(wmp1, filename = paste0(path, "champagne.wav"))
+writeWave(wmp2, filename = paste0(path, "Vonstroke.wav"))
+
+# convert it to mono wav.
+wmp1 <- tuneR::mono(wmp1)
+wmp2 <- tuneR::mono(wmp2)
+
+# Concatenate the two music in a single one, and export it as a wav file.
+w2 = bind(wmp1, wmp2)
+writeWave(w2, filename = paste0(path, "two.wav"))
+
+# Concatenate by range time alternatively first 3 second range time of one followed
+# by 3 seconds of the second and so one (6 samples or more).
+# read in two files in wav format.
+wav1 = readWave(paste0(path, "champagne.wav") )
+wav2 = readWave(paste0(path, "Vonstroke.wav") )
+
+# extract from 0 to 3 seconds music.
+ch1 = extractWave(wav1, from = 0, to = 3, xunit = "time")
+ch2 = extractWave(wav1, from = 3, to = 6, xunit = "time")
+ch3 = extractWave(wav1, from = 6, to = 9, xunit = "time")
+vo1 =extractWave(wav2, from = 0, to = 3, xunit = "time")
+vo2 =extractWave(wav2, from = 3, to = 6, xunit = "time")
+vo3 = extractWave(wav2, from = 6, to = 9, xunit = "time")
+
+# convert it to mono wav.
+ch1 <- tuneR::mono(ch1)
+ch2 <- tuneR::mono(ch2)
+ch3 <- tuneR::mono(ch3)
+vo1 <- tuneR::mono(vo1)
+vo2 <- tuneR::mono(vo2)
+vo3 <- tuneR::mono(vo3)
+
+combi = bind(ch1, vo1, ch2, vo2, ch3, vo3)
+```
+
+```{r}
+# 10. To stack two pieces of music we use arithmetic of tuneR method ‘+’.
+# Load champagne.mp” and electro.mp3.
+Wav1 = readMP3( paste0(path, "champagne.mp3") )
+Wav2 = readMP3( paste0(path, "electro.mp3") )
+# convert to wav and select the same quantity of samples for addition.
+writeWave(Wav1, filename = paste0(path, "champagne.wav") )
+writeWave(Wav2, filename = paste0(path, "electro.wav") )
+Wav_ch = readWave( paste0(path, "champagne.wav") )
+Wav_el = readWave( paste0(path, "electro.wav") )
+Wav_ch1 = extractWave(Wav_ch, from = 1, to = 500000)
+Wav_ch2 = extractWave(Wav_el, from = 1, to = 500000)
+# www = Wav_ch1+Wav_ch2 # if both are stereo
+www = Wave(Wav_ch1@left+Wav_ch2@left, samp.rate= 44100, bit=16) #if one is mono
+tuneR::play(normalize(www, unit=c("16")))
+
+# then, create something more harmonious.
+wav_sa_mp = readMP3(paste0(path, "satie_gymnopedie_no_1.mp3"))
+wav_lo_mp = readMP3(paste0(path, "bass-lounge.mp3"))
+writeWave(wav_sa_mp, filename = paste0(path, "satie_gymnopedie_no_1.wav"))
+writeWave(wav_lo_mp, filename = paste0(path, "bass-lounge.wav"))
+wav_sa = readWave(paste0(path, "satie_gymnopedie_no_1.wav"))
+wav_lo = readWave(paste0(path, "bass-lounge.wav"))
+# extract from 1 to 500000 seconds music.
+wav_sa_ex = extractWave(wav_sa, from = 1, to = 500000)
+wav_lo_ex = extractWave(wav_lo, from = 1, to = 500000)
+# concate two sounds using addition.
+# www = Wav_ch1 + Wav_ch2 # if both are stereo
+www = Wave(wav_sa_ex@left+wav_lo_ex@left, samp.rate= 44100, bit=16) #if one is mono
+# save the wave to a file called satie-lounge.wav by using writeWave function.
+tuneR::writeWave(www, filename = 'satie_lounge.wav')
+# using play function to play it.
+tuneR::play(normalize(www, unit=c("16")))
+```
+
+```{r}
+# 11. choose two music of your preference and make a mix as in question 9/10.
+wav_mp_1 = readMP3(paste0(path, "Vonstroke.mp3"))
+wav_mp_2 = readMP3(paste0(path, "bass-lounge.mp3"))
+# convert it to mono wav.
+wav_mp_1 <- tuneR::mono(wav_mp_1)
+wav_mp_2 <- tuneR::mono(wav_mp_2)
+# save sound into wav form.
+writeWave(wav_mp_1, filename = paste0(path, "Vonstroke.wav"))
+writeWave(wav_mp_2, filename = paste0(path, "bass-lounge.wav"))
+
+wav_1 = readWave(paste0(path, "Vonstroke.wav"))
+wav_2 = readWave(paste0(path, "bass-lounge.wav"))
+# extract from 1 to 500000 seconds music.
+wav_1_ex = extractWave(wav_1, from = 1, to = 1000, xunit = 'time')
+wav_2_ex = extractWave(wav_2, from = 1, to = 1000, xunit = 'time')
+# concate two sounds using addition.
+#www = wav_1_ex + wav_2_ex # if both are stereo
+www = Wave(wav_1_ex@left+wav_2_ex@left, samp.rate= 44100, bit=16) #if one is mono
+# save the wave to a file called satie-lounge.wav by using writeWave function.
+#tuneR::writeWave(www, filename = 'Von_bass.wav')
+savewav(www, filename = 'Von_bass.wav')
+# using play function to play it.
+tuneR::play(normalize(www, unit=c("16")))
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
